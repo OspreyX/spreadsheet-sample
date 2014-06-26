@@ -478,6 +478,10 @@ if __name__ == '__main__':
     
     # Populate recent transactions and stats
     r = requests.get(target_host + '/v1/accounts/' + str(account_id) + '/transactions?count=500', headers=headers)
+    if ( r.status_code != requests.codes.ok ):
+        print "Error while retrieving transactions: " + (r.json())['message']
+        workbook.close()
+        exit(-1)        
     PopulateAccountStatus( (r.json())['transactions'] )
     
     # Populate open positions
