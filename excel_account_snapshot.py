@@ -13,7 +13,7 @@ def GetValue(values, key):
         
 def GetDuration(transaction):
     if (transaction is not None):
-        r = requests.get('http://api-sandbox.oanda.com/v1/accounts/' + str(transaction['accountId']) + '/transactions/' + str(transaction['tradeId']))
+        r = requests.get(target_host + '/v1/accounts/' + str(transaction['accountId']) + '/transactions/' + str(transaction['tradeId']), headers=headers)
         opening_transaction = r.json()
         closing = time.mktime(time.strptime(transaction['time'], "%Y-%m-%dT%H:%M:%S.000000Z"))
         opening = time.mktime(time.strptime(opening_transaction['time'], "%Y-%m-%dT%H:%M:%S.000000Z"))
@@ -389,7 +389,7 @@ def PopulateCurrentRates( positions ):
     worksheet1.write(position_row, 6, 'Ask', small_bold)
     position_row += 1
     for position in positions:
-        r = requests.get('http://api-sandbox.oanda.com/v1/prices?instruments=' + position['instrument'])
+        r = requests.get(target_host + '/v1/prices?instruments=' + position['instrument'], headers=headers)
         prices = (r.json())['prices']
         worksheet1.write(position_row, 0, prices[0]['instrument'], small)
         worksheet1.write(position_row, 3, prices[0]['bid'], small)
@@ -399,7 +399,7 @@ def PopulateCurrentRates( positions ):
     cur_column = 0
     first_col = True
     for position in positions:
-        r = requests.get('http://api-sandbox.oanda.com/v1/candles?instrument=' + position['instrument'] + '&granularity=H1&count=24&candleFormat=bidask')
+        r = requests.get(target_host + '/v1/candles?instrument=' + position['instrument'] + '&granularity=H1&count=24&candleFormat=bidask', headers=headers)
         prices = r.json()
         cur_row = 0
         for price in prices['candles']:
@@ -437,12 +437,26 @@ def PopulateCurrentRates( positions ):
         cur_column += 3
 
 if __name__ == '__main__':
-    if ( len(sys.argv) != 2 ):
-        print "Usage: " + os.path.basename(__file__) + " account_id"
+    if ( len(sys.argv) != 4 ):
+        print "Usage: " + os.path.basename(__file__) + " SANDBOX|PRACTICE|TRADE account_id personal_access_token"
         exit(-1)
         
-    account_id = sys.argv[1]
-
+    account_id = sys.argv[2]
+    target_host = None
+    
+    if ( str(sys.argv[1]).upper() == 'SANDBOX' ):
+        target_host = 'http://api-sandbox.oanda.com'
+    elif ( str(sys.argv[1]).upper() == 'PRACTICE' ):
+        target_host = 'https://api-fxpractice.oanda.com'
+    elif ( str(sys.argv[1]).upper() == 'TRADE' ):
+        target_host = 'https://api-fxtrade.oanda.com'
+    else:
+        print "Invalid target. Please specify either SANDBOX, PRACTICE, or TRADE."
+        exit(-1)
+    
+    personal_access_token = sys.argv[3]
+    headers = {'Authorization' : 'Bearer ' + personal_access_token}
+    
     # Create and set up workbook
     workbook = xlsxwriter.Workbook('account_snapshot.xlsx')
     worksheet1 = workbook.add_worksheet('Account_Snapshot')
@@ -459,15 +473,15 @@ if __name__ == '__main__':
     SetUpWorkbook()
     
     # Get account info
-    r = requests.get('http://api-sandbox.oanda.com/v1/accounts/' + str(account_id))
+    r = requests.get(target_host + '/v1/accounts/' + str(account_id), headers=headers)
     PopulateAccountInfo( r.json() )
     
     # Populate recent transactions and stats
-    r = requests.get('http://api-sandbox.oanda.com/v1/accounts/' + str(account_id) + '/transactions')
+    r = requests.get(target_host + '/v1/accounts/' + str(account_id) + '/transactions?count=500', headers=headers)
     PopulateAccountStatus( (r.json())['transactions'] )
     
     # Populate open positions
-    r = requests.get('http://api-sandbox.oanda.com/v1/accounts/' + str(account_id) + '/positions')
+    r = requests.get(target_host + '/v1/accounts/' + str(account_id) + '/positions', headers=headers)
     PopulateOpenPositions( (r.json())['positions'] )
     
     # Populate current rates
